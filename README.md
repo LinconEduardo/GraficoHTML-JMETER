@@ -1,1 +1,3 @@
-Gráfico simples gerado com ajuda da IA para os resultados de testes do Jmeter
+Gráfico simples para exibição dos resultados dos testes com Jmeter.
+
+> https://linconeduardo.github.io/GraficoHTML-JMETER/
