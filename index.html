@@ -44,6 +44,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Performance Charts (22/05 to 02/06)</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -72,14 +73,14 @@
       text-align: center;
       color: #333;
     }
-    .> EXPANDIR <-link {
+    .expand-link {
       display: inline-block;
       margin-bottom: 10px;
       color: #1f77b4;
       text-decoration: none;
       font-weight: bold;
     }
-    .> EXPANDIR <-link:hover {
+    .expand-link:hover {
       text-decoration: underline;
     }
     .modal {
@@ -114,45 +115,94 @@
       width: 800px !important;
       height: 500px !important;
     }
+    footer {
+      text-align: center;
+      margin-top: 20px;
+      padding: 10px;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      color: #333;
+      font-size: 14px;
+      max-width: 1400px;
+      margin-left: auto;
+      margin-right: auto;
+    }
   </style>
 </head>
 <body>
   <h1>Validação Jmeter (22/05 até 02/06)</h1>
   <div class="chart-container">
     <div class="chart">
-      <a href="#" class="> EXPANDIR <-link" onclick="openModal('chartMínimo')">> EXPANDIR <</a>
+      <a href="#" class="expand-link" onclick="openModal('chartMínimo')">> EXPANDIR <</a>
       <canvas id="chartMínimo"></canvas>
     </div>
     <div class="chart">
-      <a href="#" class="> EXPANDIR <-link" onclick="openModal('chartMáximo')">> EXPANDIR <</a>
-      <canvas id="chartMáximo"></canvas>
-    </div>
-    <div class="chart">
-      <a href="#" class="> EXPANDIR <-link" onclick="openModal('chartMédia')">> EXPANDIR <</a>
+      <a href="#" class="expand-link" onclick="openModal('chartMédia')">> EXPANDIR <</a>
       <canvas id="chartMédia"></canvas>
     </div>
     <div class="chart">
-      <a href="#" class="> EXPANDIR <-link" onclick="openModal('chart90')">> EXPANDIR <</a>
-      <canvas id="chart90"></canvas>
+      <a href="#" class="expand-link" onclick="openModal('chartMáximo')">> EXPANDIR <</a>
+      <canvas id="chartMáximo"></canvas>
     </div>
     <div class="chart">
-      <a href="#" class="> EXPANDIR <-link" onclick="openModal('chart95')">> EXPANDIR <</a>
+      <a href="#" class="expand-link" onclick="openModal('chart95')">> EXPANDIR <</a>
       <canvas id="chart95"></canvas>
     </div>
     <div class="chart">
-      <a href="#" class="> EXPANDIR <-link" onclick="openModal('chart99')">> EXPANDIR <</a>
+      <a href="#" class="expand-link" onclick="openModal('chart99')">> EXPANDIR <</a>
       <canvas id="chart99"></canvas>
+    </div>
+    <div class="chart">
+      <a href="#" class="expand-link" onclick="openModal('chartThroughput')">> EXPANDIR <</a>
+      <canvas id="chartThroughput"></canvas>
     </div>
   </div>
 
   <div id="modal" class="modal">
     <div class="modal-content">
-      <span class="close-button" onclick="closeModal()">&times;</span>
+      <span class="close-button" onclick="closeModal()">×</span>
       <canvas id="modalChart"></canvas>
     </div>
   </div>
 
-  <script>
+  <footer>
+    - 95% e 99%: das requisições foram mais rápidas ou iguais a esse valor (ms/s)<br>
+	- Throughput: Número de requisições processadas pelo servidor (req/s).
+  </footer>
+
+  <script type="text/javascript">
+    var gk_isXlsx = false;
+    var gk_xlsxFileLookup = {};
+    var gk_fileData = {};
+    function filledCell(cell) {
+      return cell !== '' && cell != null;
+    }
+    function loadFileData(filename) {
+      if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+        try {
+          var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+          var firstSheetName = workbook.SheetNames[0];
+          var worksheet = workbook.Sheets[firstSheetName];
+          var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+          var filteredData = jsonData.filter(row => row.some(filledCell));
+          var headerRowIndex = filteredData.findIndex((row, index) =>
+            row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+          );
+          if (headerRowIndex === -1 || headerRowIndex > 25) {
+            headerRowIndex = 0;
+          }
+          var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
+          csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+          return csv;
+        } catch (e) {
+          console.error(e);
+          return "";
+        }
+      }
+      return gk_fileData[filename] || "";
+    }
+
     const labels = ["22/05", "23/05", "24/05", "25/05", "26/05", "27/05", "28/05", "29/05", "30/05", "31/05", "02/06"];
     const colors = {
       cartaoPonto: "#1f77b4",
@@ -162,99 +212,99 @@
 
     const chartConfigs = {
       chartMínimo: {
-        type: 'bar',
+        type: 'line',
         data: {
           labels: labels,
           datasets: [
-            { label: 'Cartão Ponto', data: [146, 148, 147, 189, 146, 147, 148, 142, 153, 143, 148], backgroundColor: colors.cartaoPonto },
-            { label: 'Cálculos', data: [252, 248, 249, 396, 263, 248, 241, 249, 261, 244, 248], backgroundColor: colors.calculos },
-            { label: 'Ponto Diário', data: [85, 88, 84, 100, 84, 85, 86, 83, 88, 82, 86], backgroundColor: colors.pontoDiario }
+            { label: 'Cartão Ponto', data: [146, 148, 147, 189, 146, 147, 148, 142, 153, 143, 148], borderColor: colors.cartaoPonto, fill: false },
+            { label: 'Cálculos', data: [252, 248, 249, 396, 263, 248, 241, 249, 261, 244, 248], borderColor: colors.calculos, fill: false },
+            { label: 'Ponto Diário', data: [85, 88, 84, 100, 84, 85, 86, 83, 88, 82, 86], borderColor: colors.pontoDiario, fill: false }
           ]
         },
         options: {
           responsive: true,
-          plugins: { title: { display: true, text: 'Mínimo de Tempo de Resposta' }, legend: { position: 'top' } },
+          plugins: { title: { display: true, text: 'Mínimo de Tempo de Resposta (ms)' }, legend: { position: 'top' } },
           scales: { x: { title: { display: true, text: 'Dia' } }, y: { title: { display: true, text: 'Mínimo (ms)' }, beginAtZero: true } }
         }
       },
       chartMáximo: {
-        type: 'bar',
+        type: 'line',
         data: {
           labels: labels,
           datasets: [
-            { label: 'Cartão Ponto', data: [3694, 5893, 3182, 2728, 15219, 24502, 7961, 33397, 7126, 7973, 38406], backgroundColor: colors.cartaoPonto },
-            { label: 'Cálculos', data: [7220, 6563, 2734, 3594, 17317, 25694, 9520, 33841, 4844, 4832, 45952], backgroundColor: colors.calculos },
-            { label: 'Ponto Diário', data: [3414, 3730, 1693, 2778, 15296, 2893, 7262, 24227, 6862, 2370, 26146], backgroundColor: colors.pontoDiario }
+            { label: 'Cartão Ponto', data: [3694, 5893, 3182, 2728, 15219, 24502, 7961, 33397, 7126, 7973, 38406], borderColor: colors.cartaoPonto, fill: false },
+            { label: 'Cálculos', data: [7220, 6563, 2734, 3594, 17317, 25694, 9520, 33841, 4844, 4832, 45952], borderColor: colors.calculos, fill: false },
+            { label: 'Ponto Diário', data: [3414, 3730, 1693, 2778, 15296, 2893, 7262, 24227, 6862, 2370, 26146], borderColor: colors.pontoDiario, fill: false }
           ]
         },
         options: {
           responsive: true,
-          plugins: { title: { display: true, text: 'Máximo de Tempo de Resposta' }, legend: { position: 'top' } },
-          scales: { x: { title: { display: true, text: 'Dia' } }, y: { title: { display: true, text: 'Máximo (ms)' }, beginAtZero: true, max: 10000 } }
+          plugins: { title: { display: true, text: 'Máximo de Tempo de Resposta (ms)' }, legend: { position: 'top' } },
+          scales: { x: { title: { display: true, text: 'Dia' } }, y: { title: { display: true, text: 'Máximo (ms)' }, beginAtZero: true } }
         }
       },
       chartMédia: {
-        type: 'bar',
+        type: 'line',
         data: {
           labels: labels,
           datasets: [
-            { label: 'Cartão Ponto', data: [553.19, 537.38, 583.78, 536.30, 512.93, 529.50, 555.21, 387.73, 500.20, 340.32, 587.52], backgroundColor: colors.cartaoPonto },
-            { label: 'Cálculos', data: [769.94, 739.99, 797.79, 1385.86, 819.42, 752.10, 791.83, 642.22, 722.89, 765.97, 1103.32], backgroundColor: colors.calculos },
-            { label: 'Ponto Diário', data: [464.55, 450.53, 495.87, 321.47, 396.63, 435.74, 464.88, 287.09, 412.08, 204.57, 343.86], backgroundColor: colors.pontoDiario }
+            { label: 'Cartão Ponto', data: [553.19, 537.38, 583.78, 536.30, 512.93, 529.50, 555.21, 387.73, 500.20, 340.32, 587.52], borderColor: colors.cartaoPonto, fill: false },
+            { label: 'Cálculos', data: [769.94, 739.99, 797.79, 1385.86, 819.42, 752.10, 791.83, 642.22, 722.89, 765.97, 1103.32], borderColor: colors.calculos, fill: false },
+            { label: 'Ponto Diário', data: [464.55, 450.53, 495.87, 321.47, 396.63, 435.74, 464.88, 287.09, 412.08, 204.57, 343.86], borderColor: colors.pontoDiario, fill: false }
           ]
         },
         options: {
           responsive: true,
-          plugins: { title: { display: true, text: 'Média de Tempo de Resposta' }, legend: { position: 'top' } },
+          plugins: { title: { display: true, text: 'Média de Tempo de Resposta (ms)' }, legend: { position: 'top' } },
           scales: { x: { title: { display: true, text: 'Dia' } }, y: { title: { display: true, text: 'Média (ms)' }, beginAtZero: true } }
         }
       },
-      chart90: {
-        type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [
-            { label: 'Cartão Ponto', data: [691.00, 726.00, 720.00, 770.00, 657.00, 674.00, 742.00, 550.00, 700.00, 514.00, 1298.90], backgroundColor: colors.cartaoPonto },
-            { label: 'Cálculos', data: [952.00, 972.00, 1016.00, 1713.00, 1249.00, 998.90, 1053.00, 973.90, 985.00, 1154.00, 2431.90], backgroundColor: colors.calculos },
-            { label: 'Ponto Diário', data: [599.00, 632.00, 631.00, 500.00, 515.00, 579.00, 645.00, 433.00, 602.00, 349.00, 734.90], backgroundColor: colors.pontoDiario }
-          ]
-        },
-        options: {
-          responsive: true,
-          plugins: { title: { display: true, text: '90% de Tempo de Resposta' }, legend: { position: 'top' } },
-          scales: { x: { title: { display: true, text: 'Dia' } }, y: { title: { display: true, text: '90% (ms)' }, beginAtZero: true } }
-        }
-      },
       chart95: {
-        type: 'bar',
+        type: 'line',
         data: {
           labels: labels,
           datasets: [
-            { label: 'Cartão Ponto', data: [735.00, 805.00, 769.00, 846.00, 809.00, 736.00, 809.00, 624.00, 791.00, 601.00, 2559.00], backgroundColor: colors.cartaoPonto },
-            { label: 'Cálculos', data: [1088.95, 1111.00, 1109.00, 1823.00, 1601.00, 1176.00, 1257.95, 1196.00, 1163.00, 1337.00, 3896.00], backgroundColor: colors.calculos },
-            { label: 'Ponto Diário', data: [634.00, 700.00, 675.00, 565.00, 569.00, 626.00, 702.00, 490.00, 684.00, 415.00, 1389.00], backgroundColor: colors.pontoDiario }
+            { label: 'Cartão Ponto', data: [735.00, 805.00, 769.00, 846.00, 809.00, 736.00, 809.00, 624.00, 791.00, 601.00, 2559.00], borderColor: colors.cartaoPonto, fill: false },
+            { label: 'Cálculos', data: [1088.95, 1111.00, 1109.00, 1823.00, 1601.00, 1176.00, 1257.95, 1196.00, 1163.00, 1337.00, 3896.00], borderColor: colors.calculos, fill: false },
+            { label: 'Ponto Diário', data: [634.00, 700.00, 675.00, 565.00, 569.00, 626.00, 702.00, 490.00, 684.00, 415.00, 1389.00], borderColor: colors.pontoDiario, fill: false }
           ]
         },
         options: {
           responsive: true,
-          plugins: { title: { display: true, text: '95% de Tempo de Resposta' }, legend: { position: 'top' } },
+          plugins: { title: { display: true, text: '95% de Tempo de Resposta (ms)' }, legend: { position: 'top' } },
           scales: { x: { title: { display: true, text: 'Dia' } }, y: { title: { display: true, text: '95% (ms)' }, beginAtZero: true } }
         }
       },
       chart99: {
-        type: 'bar',
+        type: 'line',
         data: {
           labels: labels,
           datasets: [
-            { label: 'Cartão Ponto', data: [954.98, 1012.00, 854.99, 1032.00, 1722.99, 1033.98, 1190.98, 888.99, 1161.00, 873.99, 5473.94], backgroundColor: colors.cartaoPonto },
-            { label: 'Cálculos', data: [1705.00, 1750.97, 1333.99, 2179.00, 2863.99, 1737.96, 1972.99, 1819.99, 1888.97, 1801.00, 7458.95], backgroundColor: colors.calculos },
-            { label: 'Ponto Diário', data: [727.99, 852.00, 756.99, 711.99, 1012.99, 814.99, 939.97, 625.99, 1069.98, 560.99, 2981.96], backgroundColor: colors.pontoDiario }
+            { label: 'Cartão Ponto', data: [954.98, 1012.00, 854.99, 1032.00, 1722.99, 1033.98, 1190.98, 888.99, 1161.00, 873.99, 5473.94], borderColor: colors.cartaoPonto, fill: false },
+            { label: 'Cálculos', data: [1705.00, 1750.97, 1333.99, 2179.00, 2863.99, 1737.96, 1972.99, 1819.99, 1888.97, 1801.00, 7458.95], borderColor: colors.calculos, fill: false },
+            { label: 'Ponto Diário', data: [727.99, 852.00, 756.99, 711.99, 1012.99, 814.99, 939.97, 625.99, 1069.98, 560.99, 2981.96], borderColor: colors.pontoDiario, fill: false }
           ]
         },
         options: {
           responsive: true,
-          plugins: { title: { display: true, text: '99% de Tempo de Resposta' }, legend: { position: 'top' } },
-          scales: { x: { title: { display: true, text: 'Dia' } }, y: { title: { display: true, text: '99% (ms)' }, beginAtZero: true, max: 10000 } }
+          plugins: { title: { display: true, text: '99% de Tempo de Resposta (ms)' }, legend: { position: 'top' } },
+          scales: { x: { title: { display: true, text: 'Dia' } }, y: { title: { display: true, text: '99% (ms)' }, beginAtZero: true } }
+        }
+      },
+      chartThroughput: {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            { label: 'Cartão Ponto', data: [16.78, 17.36, 15.98, 13.37, 17.35, 17.47, 16.57, 22.78, 18.34, 22.88, 14.74], borderColor: colors.cartaoPonto, fill: false },
+            { label: 'Cálculos', data: [16.78, 17.36, 15.98, 13.37, 17.35, 17.46, 16.55, 22.77, 18.34, 22.87, 14.74], borderColor: colors.calculos, fill: false },
+            { label: 'Ponto Diário', data: [16.78, 17.36, 15.98, 13.37, 17.35, 17.47, 16.57, 22.78, 18.35, 22.88, 14.74], borderColor: colors.pontoDiario, fill: false }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: { title: { display: true, text: 'Throughput (req/s)' }, legend: { position: 'top' } },
+          scales: { x: { title: { display: true, text: 'Dia' } }, y: { title: { display: true, text: 'Throughput (req/s)' }, beginAtZero: true } }
         }
       }
     };
@@ -272,12 +322,10 @@
       const modalCanvas = document.getElementById('modalChart');
       modal.style.display = 'flex';
       
-      // Destroy previous chart if exists
       if (currentChart) {
         currentChart.destroy();
       }
       
-      // Create new chart in modal with larger size
       currentChart = new Chart(modalCanvas.getContext('2d'), {
         ...chartConfigs[chartId],
         options: {
